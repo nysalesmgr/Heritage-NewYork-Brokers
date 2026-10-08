@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heritage Collection — New York Broker Rates (Fall)</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3.5' fill='%23303c6c'/%3E%3Ctext x='8' y='10.8' text-anchor='middle' fill='%23e8527a' font-size='6.4' font-weight='700' font-family='Arial, sans-serif'%3ENYB%3C/text%3E%3C/svg%3E">
+<style>
+  :root { --navy:#303c6c; --pink:#e8527a; --bg:#f4f6fb; --border:#dfe3ee; --text:#1f2540; --muted:#6b7392; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  header { background: var(--navy); color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .pill { display: inline-block; background: var(--pink); color: #fff; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; padding: 6px 14px; border-radius: 20px; }
+  .hdr-right { display: flex; align-items: center; gap: 12px; }
+  #refreshBtn { font: inherit; font-size: 12px; font-weight: 600; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.6); border-radius: 20px; padding: 6px 14px; cursor: pointer; }
+  #refreshBtn:hover { background: rgba(255,255,255,.15); }
+  #refreshBtn:disabled { opacity: .6; cursor: default; }
+  .meta { font-size: 12px; opacity: .85; }
+  main { max-width: none; width: 100%; margin: 0; padding: 20px 24px 48px; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .filters input, .filters select { font: inherit; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; min-width: 180px; }
+  .filters input { flex: 1; min-width: 220px; }
+  .area-header { position: sticky; top: 0; z-index: 5; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; margin: 22px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--navy); }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .card-head { padding: 12px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 15px; font-weight: 600; }
+  .tag { font-size: 11px; color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); padding: 9px 12px; background: #fafbfe; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid #eef0f6; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .unit { font-weight: 600; white-space: nowrap; }
+  .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+  .b-available { background: #e3f1ea; color: #2f6b52; }
+  .b-agreement { background: #e53935; color: #fff; }
+  tr.row-agreement td { background: #fdecec; }
+  .b-sold { background: #e2e5ee; color: #596080; }
+  tr.row-sold td { opacity: .55; }
+  .empty { text-align: center; color: var(--muted); padding: 60px 16px; }
+  footer { text-align: center; font-size: 11px; color: var(--muted); padding: 0 16px 28px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Heritage Collection — New York Broker Rates (Fall)</h1>
+    <div class="meta" id="meta">Loading…</div>
+  </div>
+  <div class="hdr-right"><button type="button" id="refreshBtn" onclick="manualRefresh()">&#8635; Refresh</button><span class="pill" id="seasonPill">Fall</span></div>
+</header>
+<main>
+  <div class="filters">
+    <input type="search" id="search" placeholder="Search building or unit, e.g. Bleecker or 2F" oninput="applyFilters()">
+    <select id="statusFilter" onchange="applyFilters()">
+      <option value="">All availability</option>
+      <option value="available">Available</option>
+      <option value="agreement">Agreement issued</option>
+      <option value="sold">Sold</option>
+    </select>
+    <select id="buildingFilter" onchange="applyFilters()"><option value="">All buildings</option></select>
+  </div>
+  <div id="content"><div class="empty">Loading rates…</div></div>
+</main>
+<footer>Rates are per month, inclusive of utilities. Availability and rates are subject to change — please confirm before quoting.</footer>
+
+<script>
+// The rates are read from broker-data.json, which sits in the same folder as this page.
+const DATA_URL = "broker-data.json";
+const PROPERTY = "ny"; // "ny" or "boston"
+const PILL_PREFIX = "Fall"; // shown before the rate year, if any
+const REFRESH_MS = 10000; // auto-refresh every 10 seconds
+
+let DATA = null;
+let PART = { buildings: [] };
+
+function esc(s) {
+  return String(s === null || s === undefined ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function money(n) { return (n === null || n === undefined || isNaN(n)) ? "TBC" : "$" + Number(n).toLocaleString("en-US"); }
+const STATUS_LABEL = { available: "Available", agreement: "Agreement issued", sold: "Sold" };
+
+function unitDetails(u) {
+  const bits = [];
+  if (u.sqft) bits.push(esc(u.sqft) + " sq ft");
+  if (u.washerDryer && u.washerDryer !== "No") bits.push(/washer/i.test(u.washerDryer) ? esc(u.washerDryer) : esc(u.washerDryer) + " washer/dryer");
+  if (u.kitchenSink === "Yes") bits.push("Kitchen sink");
+  if (u.stove === "Yes") bits.push("Stove/oven");
+  if (u.sofa === "Yes") bits.push("Sofa");
+  if (u.ac === "Yes") bits.push("A/C");
+  if (u.dishwasher === "Yes") bits.push("Dishwasher");
+  if (u.microwave === "Yes") bits.push("Microwave Oven");
+  if (u.cooktop === "Yes") bits.push("Electric cooktop");
+  if (u.diningTable === "Yes") bits.push("Dining table");
+  else if (u.diningTable === "Flip") bits.push("Flip dining table");
+  return bits.join(" · ");
+}
+
+function typeCell(u) {
+  const label = u.groupId ? "Private room in shared apartment" : u.categoryLabel;
+  const extra = u.groupId && u.wholeAptOpt3 !== null && u.wholeAptOpt3 !== undefined
+    ? `<div class="sub">Whole apartment (Option 3): ${money(u.wholeAptOpt3)}/mo</div>` : "";
+  return `${esc(label)}${extra}`;
+}
+
+// Pure function: takes the snapshot + current filter values, returns html.
+function renderDashboard(data, f) {
+  f = f || {};
+  const q = String(f.search || "").trim().toLowerCase();
+  const out = [];
+  let lastArea = null, shown = 0;
+  (data.buildings || []).forEach(b => {
+    if (f.building && b.name !== f.building) return;
+    const bMatch = !q || b.name.toLowerCase().includes(q) || (b.neighborhood || "").toLowerCase().includes(q);
+    const units = b.units.filter(u =>
+      (!f.status || u.status === f.status) &&
+      (bMatch || u.room.toLowerCase().includes(q) || (b.name + " " + u.room).toLowerCase().includes(q)));
+    if (!units.length) return;
+    if (b.area && b.area !== lastArea) { out.push(`<div class="area-header">${esc(b.area)}</div>`); lastArea = b.area; }
+    const lift = b.elevator === true ? "Elevator" : b.elevator === false ? "Walk-up" : "";
+    out.push(`<div class="card"><div class="card-head"><h2>${esc(b.name)}</h2>` +
+      `<span class="tag">${esc([b.neighborhood, lift].filter(Boolean).join(" · "))}</span></div>` +
+      `<div class="table-wrap"><table><thead><tr><th>Unit</th><th>Type</th><th>Availability</th>` +
+      `<th>Option 1<br>Monthly</th><th>Option 2<br>2 instalments</th><th>Option 3<br>Full upfront</th><th>Details</th></tr></thead><tbody>` +
+      units.map(u => {
+        shown++;
+        return `<tr class="${u.status === "sold" ? "row-sold" : u.status === "agreement" ? "row-agreement" : ""}">` +
+          `<td class="unit">${esc(u.room)}</td><td>${typeCell(u)}</td>` +
+          `<td><span class="badge b-${esc(u.status)}">${esc(STATUS_LABEL[u.status] || u.status)}</span></td>` +
+          `<td class="num">${money(u.opt1)}</td><td class="num">${money(u.opt2)}</td><td class="num">${money(u.opt3)}</td>` +
+          `<td><div class="sub" style="margin:0;">${unitDetails(u)}</div></td></tr>`;
+      }).join("") + `</tbody></table></div></div>`);
+  });
+  if (!shown) return `<div class="empty">No units match your search.</div>`;
+  return out.join("");
+}
+
+function currentFilters() {
+  return {
+    search: document.getElementById("search").value,
+    status: document.getElementById("statusFilter").value,
+    building: document.getElementById("buildingFilter").value,
+  };
+}
+
+function applyFilters() {
+  if (!DATA) return;
+  document.getElementById("content").innerHTML = renderDashboard(PART, currentFilters());
+}
+
+function fillBuildingFilter(data) {
+  const sel = document.getElementById("buildingFilter");
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">All buildings</option>`;
+  const byArea = {};
+  (data.buildings || []).forEach(b => { (byArea[b.area || "Other"] = byArea[b.area || "Other"] || []).push(b.name); });
+  Object.keys(byArea).forEach(a => {
+    sel.insertAdjacentHTML("beforeend", `<optgroup label="${esc(a)}">` + byArea[a].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("") + `</optgroup>`);
+  });
+  sel.value = keep;
+}
+
+// Reads straight from GitHub's API (no CDN delay). Repeat checks are cheap
+// "has it changed?" requests. Falls back to the plain file if that fails.
+function repoFromLocation() {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  const repo = location.pathname.split("/").filter(Boolean)[0];
+  return (m && repo && !/\.html?$/i.test(repo)) ? { owner: m[1], repo: repo } : null;
+}
+async function fetchData() {
+  const gh = repoFromLocation();
+  if (gh) {
+    try {
+      const r = await fetch("https://api.github.com/repos/" + gh.owner + "/" + gh.repo + "/contents/" + DATA_URL.replace(/^.*\//, ""),
+        { cache: "no-cache", headers: { "Accept": "application/vnd.github.raw+json" } });
+      if (r.ok || r.status === 404) return r;
+    } catch (e) {}
+  }
+  return fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+}
+
+async function manualRefresh() {
+  const b = document.getElementById("refreshBtn");
+  b.disabled = true; b.textContent = "Refreshing…";
+  await load();
+  b.disabled = false; b.innerHTML = "&#8635; Refresh";
+}
+
+async function load() {
+  const meta = document.getElementById("meta");
+  try {
+    const r = await fetchData();
+    if (r.status === 404) {
+      meta.textContent = "No rates published yet";
+      document.getElementById("content").innerHTML = `<div class="empty">No rates have been published yet.</div>`;
+      return;
+    }
+    DATA = await r.json();
+    PART = DATA[PROPERTY] || { buildings: [] };
+    if (PILL_PREFIX && DATA.rateYear) document.getElementById("seasonPill").textContent = PILL_PREFIX + " " + DATA.rateYear;
+    const when = DATA.updatedAt ? new Date(DATA.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "—";
+    meta.textContent = "Last updated " + when;
+    fillBuildingFilter(PART);
+    if (!(PART.buildings || []).length) document.getElementById("content").innerHTML = `<div class="empty">No rates have been published yet.</div>`;
+    else applyFilters();
+  } catch (e) {
+    meta.textContent = "Couldn't load the latest rates";
+    if (!DATA) document.getElementById("content").innerHTML = `<div class="empty">Couldn't load rates right now. Please refresh in a moment.</div>`;
+  }
+}
+
+load();
+setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
+</script>
+</body>
+</html>
