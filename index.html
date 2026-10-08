@@ -55,6 +55,13 @@
   tr.row-agreement td.amen { background: #fff; }
   .b-sold { background: #e2e5ee; color: #596080; }
   tr.row-sold td { opacity: .55; }
+  .tbtn { font: inherit; font-size: 12px; font-weight: 600; color: var(--navy); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px; cursor: pointer; white-space: nowrap; }
+  .tbtn:hover { background: #eef1f9; }
+  .card-head { cursor: pointer; user-select: none; }
+  .card-head .chev { display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+  .card.collapsed .card-head .chev { transform: rotate(-90deg); }
+  .card.collapsed .card-head { border-bottom: none; }
+  .card.collapsed .table-wrap { display: none; }
   .empty { text-align: center; color: var(--muted); padding: 60px 16px; }
   footer { text-align: center; font-size: 11px; color: var(--muted); padding: 0 16px 28px; }
 </style>
@@ -76,7 +83,14 @@
       <option value="agreement">Agreement issued</option>
       <option value="sold">Sold</option>
     </select>
+    <select id="genderFilter" onchange="applyFilters()">
+      <option value="">All genders</option>
+      <option value="Male">Male</option>
+      <option value="Female">Female</option>
+    </select>
     <select id="buildingFilter" onchange="applyFilters()"><option value="">All buildings</option></select>
+    <button type="button" class="tbtn" onclick="setAllCollapsed(false)">&#8862; Expand all</button>
+    <button type="button" class="tbtn" onclick="setAllCollapsed(true)">&#8863; Collapse all</button>
   </div>
   <div id="content"><div class="empty">Loading rates…</div></div>
 </main>
@@ -88,6 +102,24 @@ const DATA_URL = "broker-data.json";
 const PROPERTY = "ny"; // "ny" or "boston"
 const PILL_PREFIX = "Fall"; // shown before the rate year, if any
 const REFRESH_MS = 10000; // auto-refresh every 10 seconds
+
+// Which building cards the viewer has collapsed (kept across the 10-second refreshes).
+let COLLAPSED = new Set();
+try { COLLAPSED = new Set(JSON.parse(localStorage.getItem("hc_broker_collapsed_ny") || "[]")); } catch (e) {}
+function saveCollapsed() { try { localStorage.setItem("hc_broker_collapsed_ny", JSON.stringify(Array.from(COLLAPSED))); } catch (e) {} }
+function toggleCard(head) {
+  const name = head.getAttribute("data-name");
+  const card = head.parentNode;
+  card.classList.toggle("collapsed");
+  if (card.classList.contains("collapsed")) COLLAPSED.add(name); else COLLAPSED.delete(name);
+  saveCollapsed();
+}
+function setAllCollapsed(collapse) {
+  COLLAPSED = new Set();
+  if (collapse) (PART.buildings || []).forEach(b => COLLAPSED.add(b.name));
+  saveCollapsed();
+  applyFilters();
+}
 
 let DATA = null;
 let PART = { buildings: [] };
@@ -132,6 +164,7 @@ function renderDashboard(data, f) {
     const bMatch = !q || b.name.toLowerCase().includes(q) || (b.neighborhood || "").toLowerCase().includes(q);
     const units = b.units.filter(u =>
       (!f.status || u.status === f.status) &&
+      (!f.gender || !u.gender || u.gender === f.gender) &&
       (bMatch || u.room.toLowerCase().includes(q) || (b.name + " " + u.room).toLowerCase().includes(q)));
     if (!units.length) return;
     if (b.area && b.area !== lastArea) { out.push(`<div class="area-header">${esc(b.area)}</div>`); lastArea = b.area; }
@@ -154,7 +187,7 @@ function renderDashboard(data, f) {
         whole +
         `<td class="num rate">${money(u.opt3)}</td><td class="num rate">${money(u.opt2)}</td><td class="num rate">${money(u.opt1)}</td>` + amen + `</tr>`;
     }).join("");
-    out.push(`<div class="card"><div class="card-head"><h2>${esc(b.name)}</h2>` +
+    out.push(`<div class="card${COLLAPSED.has(b.name) ? " collapsed" : ""}"><div class="card-head" data-name="${esc(b.name)}" onclick="toggleCard(this)"><span class="chev">&#9660;</span><h2>${esc(b.name)}</h2>` +
       `<span class="tag">${esc([b.neighborhood, lift].filter(Boolean).join(" · "))}</span></div>` +
       `<div class="table-wrap"><table><thead><tr><th>Unit No</th><th>Category</th><th>Gender</th><th>Status</th>` +
       `<th class="r">Whole Apt<br>(Full Upfront)</th><th class="r">Option 3<br>(Full Upfront)</th><th class="r">Option 2<br>(2 Instalments)</th><th class="r">Option 1<br>(Monthly)</th>` +
@@ -170,6 +203,7 @@ function currentFilters() {
     search: document.getElementById("search").value,
     status: document.getElementById("statusFilter").value,
     building: document.getElementById("buildingFilter").value,
+    gender: document.getElementById("genderFilter").value,
   };
 }
 
