@@ -25,6 +25,7 @@
   .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
   .card-head { padding: 12px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
   .card-head h2 { font-size: 15px; font-weight: 600; }
+  .facing { font-size: 12px; color: var(--navy); font-weight: 500; }
   .tag { font-size: 11px; color: var(--muted); }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; min-width: 900px; }
@@ -103,21 +104,18 @@ const PROPERTY = "ny"; // "ny" or "boston"
 const PILL_PREFIX = "Fall"; // shown before the rate year, if any
 const REFRESH_MS = 10000; // auto-refresh every 10 seconds
 
-// Which building cards the viewer has collapsed (kept across the 10-second refreshes).
-let COLLAPSED = new Set();
-try { COLLAPSED = new Set(JSON.parse(localStorage.getItem("hc_broker_collapsed_ny") || "[]")); } catch (e) {}
-function saveCollapsed() { try { localStorage.setItem("hc_broker_collapsed_ny", JSON.stringify(Array.from(COLLAPSED))); } catch (e) {} }
+// Every building starts collapsed each time the page is opened. Cards a viewer
+// opens stay open through the 10-second auto-refreshes (but not a page reload).
+let EXPANDED = new Set();
 function toggleCard(head) {
   const name = head.getAttribute("data-name");
   const card = head.parentNode;
   card.classList.toggle("collapsed");
-  if (card.classList.contains("collapsed")) COLLAPSED.add(name); else COLLAPSED.delete(name);
-  saveCollapsed();
+  if (card.classList.contains("collapsed")) EXPANDED.delete(name); else EXPANDED.add(name);
 }
 function setAllCollapsed(collapse) {
-  COLLAPSED = new Set();
-  if (collapse) (PART.buildings || []).forEach(b => COLLAPSED.add(b.name));
-  saveCollapsed();
+  EXPANDED = new Set();
+  if (!collapse) (PART.buildings || []).forEach(b => EXPANDED.add(b.name));
   applyFilters();
 }
 
@@ -187,8 +185,9 @@ function renderDashboard(data, f) {
         whole +
         `<td class="num rate">${money(u.opt3)}</td><td class="num rate">${money(u.opt2)}</td><td class="num rate">${money(u.opt1)}</td>` + amen + `</tr>`;
     }).join("");
-    out.push(`<div class="card${COLLAPSED.has(b.name) ? " collapsed" : ""}"><div class="card-head" data-name="${esc(b.name)}" onclick="toggleCard(this)"><span class="chev">&#9660;</span><h2>${esc(b.name)}</h2>` +
-      `<span class="tag">${esc([b.neighborhood, lift].filter(Boolean).join(" · "))}</span></div>` +
+    out.push(`<div class="card${EXPANDED.has(b.name) ? "" : " collapsed"}"><div class="card-head" data-name="${esc(b.name)}" onclick="toggleCard(this)"><span class="chev">&#9660;</span><h2>${esc(b.name)}</h2>` +
+      `<span class="tag">${esc(b.neighborhood || "")}</span>` +
+      `<span class="facing">${esc(b.facing ? "(" + b.facing + ")" : lift)}</span></div>` +
       `<div class="table-wrap"><table><thead><tr><th>Unit No</th><th>Category</th><th>Gender</th><th>Status</th>` +
       `<th class="r">Whole Apt<br>(Full Upfront)</th><th class="r">Option 3<br>(Full Upfront)</th><th class="r">Option 2<br>(2 Instalments)</th><th class="r">Option 1<br>(Monthly)</th>` +
       cols.map(c => `<th class="amen">${c[1]}</th>`).join("") +
