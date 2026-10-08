@@ -119,6 +119,25 @@ function setAllCollapsed(collapse) {
   applyFilters();
 }
 
+// Building notes (kept here too, so they show even if the synced data lacks them).
+const FACING_FALLBACK = {
+  "308 East 52nd Street": "Elevator, Common Courtyard, Front Stack: North East Facing",
+  "111 East 39th Street": "Walk up, Gated, Front Stack: South West Facing",
+  "115 East 37th Street": "Walk up, Front Stack: South West Facing",
+  "138 East 37th Street": "Walk up, Gated, Front Stack: North East Facing",
+  "143 East 36th Street": "Walk up, Gated, Front Stack: South West Facing",
+  "336 East 15th Street": "Elevator, Common Courtyard, Front Stack: North East Facing",
+  "35 East 7th Street": "Walk up, Front Stack: South West Facing",
+  "85 2nd Avenue": "Walk up, Front Stack: South East Facing",
+  "308 West 18th Street": "Walk up, Gated, Front Stack: North East Facing",
+  "152 West 15th Street": "Walk up, Gated, Front Stack: North East Facing",
+  "230 Sullivan Street": "Walk up, Front Stack: South East Facing",
+  "176 Bleecker Street": "Walk up, Front Stack: North East Facing",
+  "133 West 3rd Street": "Walk up, Front Stack: South West Facing, Rear: South East Facing",
+  "81 Sullivan Street": "Walk up, Front Stack: West Facing",
+  "235 Sullivan Street": "Walk up, Front Stack: North West Facing",
+};
+
 let DATA = null;
 let PART = { buildings: [] };
 
@@ -187,7 +206,7 @@ function renderDashboard(data, f) {
     }).join("");
     out.push(`<div class="card${EXPANDED.has(b.name) ? "" : " collapsed"}"><div class="card-head" data-name="${esc(b.name)}" onclick="toggleCard(this)"><span class="chev">&#9660;</span><h2>${esc(b.name)}</h2>` +
       `<span class="tag">${esc(b.neighborhood || "")}</span>` +
-      `<span class="facing">${esc(b.facing ? "(" + b.facing + ")" : lift)}</span></div>` +
+      `<span class="facing">${esc((b.facing || FACING_FALLBACK[b.name]) ? "(" + (b.facing || FACING_FALLBACK[b.name]) + ")" : lift)}</span></div>` +
       `<div class="table-wrap"><table><thead><tr><th>Unit No</th><th>Category</th><th>Gender</th><th>Status</th>` +
       `<th class="r">Whole Apt<br>(Full Upfront)</th><th class="r">Option 3<br>(Full Upfront)</th><th class="r">Option 2<br>(2 Instalments)</th><th class="r">Option 1<br>(Monthly)</th>` +
       cols.map(c => `<th class="amen">${c[1]}</th>`).join("") +
